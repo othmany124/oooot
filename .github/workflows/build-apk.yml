@@ -1,4 +1,4 @@
-name: Build WA Scanner v1.2.9 Flow Repair
+name: Build WA Scanner v1.3.1 Navigation Repair
 on:
   workflow_dispatch:
   push:
@@ -32,9 +32,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f WA-Ultimate-Scanner-Android-v1.2.9-FLOW-REPAIR.zip
+          test -f WA-Ultimate-Scanner-Android-v1.3.1-NAVIGATION-REPAIR.zip
           mkdir -p extracted
-          unzip -oq WA-Ultimate-Scanner-Android-v1.2.9-FLOW-REPAIR.zip -d extracted
+          unzip -oq WA-Ultimate-Scanner-Android-v1.3.1-NAVIGATION-REPAIR.zip -d extracted
           PROJECT=$(find extracted -name settings.gradle -type f -print -quit)
           test -n "$PROJECT"
           echo "PROJECT_DIR=$(dirname "$PROJECT")" >> "$GITHUB_ENV"
@@ -57,7 +57,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Scanner-v1.2.9-FLOW-REPAIR
+          name: WA-Scanner-v1.3.1-NAVIGATION-REPAIR
           path: extracted/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
       - name: Diagnostics
