@@ -43,25 +43,39 @@ jobs:
             test -n "$PROJECT"
             echo "PROJECT_DIR=$(dirname "$PROJECT")" >> "$GITHUB_ENV"
           fi
-      - name: Restore stable signing key
+      - name: Configure preview application
         shell: bash
-        env:
-          KEY_BASE64: ${{ secrets.WA_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.WA_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.WA_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.WA_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "$KEY_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo 'Missing stable signing secrets. See UPDATE_AND_SIGNING_AR.md'
-            exit 1
-          fi
-          printf '%s' "$KEY_BASE64" | base64 -d > "$RUNNER_TEMP/wa-scanner.jks"
-          chmod 600 "$RUNNER_TEMP/wa-scanner.jks"
-          echo "WA_SIGNING_KEYSTORE=$RUNNER_TEMP/wa-scanner.jks" >> "$GITHUB_ENV"
-          echo "WA_SIGNING_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "WA_SIGNING_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "WA_SIGNING_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          python3 - <<'INNER'
+          from pathlib import Path
+          import os
+
+          file = Path(
+              os.environ["PROJECT_DIR"]
+          ) / "app/build.gradle"
+
+          source = file.read_text()
+
+          target = "        debug {"
+
+          if source.count(target) != 1:
+              raise SystemExit(
+                  "Unexpected Gradle structure"
+              )
+
+          source = source.replace(
+              target,
+              target + "\n"
+              "            applicationIdSuffix "
+              "'.preview'",
+              1
+          )
+
+          file.write_text(source)
+          print("Preview package configured")
+          INNER
+
       - name: Build Android APK
         shell: bash
         run: |
@@ -79,7 +93,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Ultimate-Scanner-v1.2.5-update
+          name: WA-Scanner-v1.2.5-PREVIEW
           path: '**/app/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
       - name: Upload diagnostic log
