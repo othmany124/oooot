@@ -1,10 +1,9 @@
-name: Build WA Scanner v1.3.6
+name: Build WA Scanner v1.3.7
 
 on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
@@ -12,13 +11,11 @@ permissions:
 
 jobs:
   android:
-    name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
-
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -27,104 +24,92 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle 8.9
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Prepare Android SDK
+      - name: Install Android SDK
         shell: bash
         run: |
           set -Eeuo pipefail
 
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
 
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-
-          SDKMANAGER=$(find "$SDK/cmdline-tools" \
+          MGR=$(find "$SDK/cmdline-tools" \
             -type f \
             -name sdkmanager \
             -print -quit)
 
-          if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found"
-            exit 1
-          fi
+          test -x "$MGR"
 
-          yes | "$SDKMANAGER" \
+          yes | "$MGR" \
             --sdk_root="$SDK" \
             --licenses >/dev/null || true
 
-          "$SDKMANAGER" \
+          "$MGR" \
             --sdk_root="$SDK" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+            'platform-tools' \
+            'platforms;android-35' \
+            'build-tools;35.0.0'
 
-      - name: Validate update archive
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+
+      - name: Verify v1.3.7 archive
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          ZIP="WA-Ultimate-Scanner-Android-v1.3.6-CLASSIFICATION-ENGINE.zip"
+          ZIP="WA-Ultimate-Scanner-Android-v1.3.7-PREVIEW-NAVIGATION-FIX.zip"
 
           test -f "$ZIP"
-
           unzip -tq "$ZIP"
 
-          echo "v1.3.6 archive verified."
-
-      - name: Extract Android source
+      - name: Extract project
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          ZIP="WA-Ultimate-Scanner-Android-v1.3.6-CLASSIFICATION-ENGINE.zip"
+          ZIP="WA-Ultimate-Scanner-Android-v1.3.7-PREVIEW-NAVIGATION-FIX.zip"
 
-          rm -rf "$GITHUB_WORKSPACE/v136-source"
-          mkdir -p "$GITHUB_WORKSPACE/v136-source"
+          rm -rf "$GITHUB_WORKSPACE/v137"
+          mkdir -p "$GITHUB_WORKSPACE/v137"
 
           unzip -oq "$ZIP" \
-            -d "$GITHUB_WORKSPACE/v136-source"
+            -d "$GITHUB_WORKSPACE/v137"
 
-          SETTINGS=$(find "$GITHUB_WORKSPACE/v136-source" \
+          SETTINGS=$(find "$GITHUB_WORKSPACE/v137" \
             -type f \
             -name settings.gradle \
             -print -quit)
 
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle missing"
-            exit 1
-          fi
+          test -n "$SETTINGS"
 
           PROJECT_DIR=$(dirname "$SETTINGS")
 
           test -f "$PROJECT_DIR/app/build.gradle"
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "PROJECT_DIR=$PROJECT_DIR" \
+            >> "$GITHUB_ENV"
 
-          echo "Project directory:"
-          echo "$PROJECT_DIR"
-
-      - name: Pre-build source audit
+      - name: Source verification
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          echo "Checking required sources..."
-
           find "$PROJECT_DIR/app/src/main" \
-            -name 'PreviewParser.java' \
+            -type f \
+            -name ScannerAccessibility.java \
             -print -quit | grep .
 
           find "$PROJECT_DIR/app/src/main" \
-            -name 'ScannerAccessibility.java' \
+            -type f \
+            -name PreviewParser.java \
             -print -quit | grep .
 
-          echo "Source audit passed."
+          echo "SOURCE CHECK PASSED"
 
-      - name: Build Debug APK
+      - name: Build debug APK
         shell: bash
         run: |
           set -o pipefail
@@ -153,14 +138,10 @@ jobs:
             -name '*.apk' \
             -print -quit)
 
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK not produced."
-            exit 1
-          fi
+          test -n "$APK"
 
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
 
-          echo "APK:"
           ls -lh "$APK"
 
       - name: Verify APK
@@ -169,23 +150,20 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-
-          "$APKSIGNER" \
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
             verify \
             --verbose \
             --print-certs \
             "$APK_PATH" \
-            | tee "$GITHUB_WORKSPACE/signature-report.txt"
+            | tee "$GITHUB_WORKSPACE/signature.txt"
 
-          "$AAPT" \
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" \
             dump badging \
             "$APK_PATH" \
             | grep '^package:' \
-            | tee "$GITHUB_WORKSPACE/package-report.txt"
+            | tee "$GITHUB_WORKSPACE/package.txt"
 
-      - name: Prepare release APK
+      - name: Prepare artifact
         if: success()
         shell: bash
         run: |
@@ -194,31 +172,31 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/release"
 
           cp "$APK_PATH" \
-            "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.3.6.apk"
+            "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.3.7.apk"
 
           sha256sum \
-            "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.3.6.apk" \
-            | tee "$GITHUB_WORKSPACE/release/SHA256.txt"
+            "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.3.7.apk" \
+            > "$GITHUB_WORKSPACE/release/SHA256.txt"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Ultimate-Scanner-v1.3.6-APK
+          name: WA-Ultimate-Scanner-v1.3.7-APK
           path: |
-            release/WA-Ultimate-Scanner-v1.3.6.apk
+            release/WA-Ultimate-Scanner-v1.3.7.apk
             release/SHA256.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload build diagnostics
+      - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-v1.3.6-Build-Diagnostics
+          name: WA-v1.3.7-Build-Diagnostics
           path: |
             build.log
-            signature-report.txt
-            package-report.txt
+            signature.txt
+            package.txt
           if-no-files-found: ignore
           retention-days: 30
