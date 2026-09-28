@@ -1,4 +1,4 @@
-name: Build WA Scanner v1.3.8 - Cross Device Navigation Fix
+name: Build WA Scanner v1.3.9 - Context Metadata + Unified UI
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="WA-Ultimate-Scanner-Android-v1.3.8-CROSS-DEVICE-NAV-FIX.zip"
+          ZIP="WA-Ultimate-Scanner-Android-v1.3.9-CONTEXT-METADATA-UNIFIED-UI.zip"
           test -f "$ZIP"
           unzip -tq "$ZIP"
           mkdir -p extracted
@@ -96,13 +96,13 @@ jobs:
             | tee "$GITHUB_WORKSPACE/signature.log"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" \
             | grep '^package:' | tee "$GITHUB_WORKSPACE/package.log"
-          grep -q 'com.waultimate.scanner.class136' "$GITHUB_WORKSPACE/package.log"
+          grep -q 'com.waultimate.scanner.meta139' "$GITHUB_WORKSPACE/package.log"
 
       - name: Upload preview APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Scanner-v1.3.8-CLASSIFICATION-PREVIEW-APK
+          name: WA-Scanner-v1.3.9-UNIFIED-PREVIEW-APK
           path: extracted/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -111,7 +111,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-v1.3.8-Build-Diagnostics
+          name: WA-v1.3.9-Build-Diagnostics
           path: |
             build.log
             source-syntax.log
