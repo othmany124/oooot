@@ -1,4 +1,4 @@
-name: Build WA Scanner v1.4.2 - Single Source + Overlay Bubble
+name: Build WA Scanner v1.4.3 - Fast Structured + No Repeat
 
 on:
   push:
@@ -38,11 +38,11 @@ jobs:
           "$MANAGER" --sdk_root="$SDK" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
 
-      - name: Extract v1.4.2 project
+      - name: Extract v1.4.3 project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="WA-Ultimate-Scanner-Android-v1.4.2-SINGLE-SOURCE-OVERLAY-BUBBLE-FIX.zip"
+          ZIP="WA-Ultimate-Scanner-Android-v1.4.3-FAST-STRUCTURED-NO-REPEAT.zip"
           test -f "$ZIP"
           unzip -tq "$ZIP"
           rm -rf extracted && mkdir extracted
@@ -83,16 +83,16 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee "$GITHUB_WORKSPACE/package.log"
           grep -q 'com.waultimate.scanner.v142' "$GITHUB_WORKSPACE/package.log"
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK" "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.2.apk"
-          sha256sum "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.2.apk" > "$GITHUB_WORKSPACE/release/SHA256.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.3.apk"
+          sha256sum "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.3.apk" > "$GITHUB_WORKSPACE/release/SHA256.txt"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Ultimate-Scanner-v1.4.2-APK
+          name: WA-Ultimate-Scanner-v1.4.3-APK
           path: |
-            release/WA-Ultimate-Scanner-v1.4.2.apk
+            release/WA-Ultimate-Scanner-v1.4.3.apk
             release/SHA256.txt
           if-no-files-found: error
           retention-days: 30
@@ -101,7 +101,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-v1.4.2-Build-Diagnostics
+          name: WA-v1.4.3-Build-Diagnostics
           path: |
             local-checks.log
             build.log
