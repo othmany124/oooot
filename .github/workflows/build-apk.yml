@@ -81,7 +81,7 @@ jobs:
           test -n "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$GITHUB_WORKSPACE/signature.log"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee "$GITHUB_WORKSPACE/package.log"
-          grep -q 'com.waultimate.scanner.v142' "$GITHUB_WORKSPACE/package.log"
+          grep -q 'com.waultimate.scanner.v143' "$GITHUB_WORKSPACE/package.log"
           mkdir -p "$GITHUB_WORKSPACE/release"
           cp "$APK" "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.3.apk"
           sha256sum "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.3.apk" > "$GITHUB_WORKSPACE/release/SHA256.txt"
