@@ -1,4 +1,4 @@
-name: Build WA Scanner v1.3.9 - Context Metadata + Unified UI
+name: Build WA Scanner v1.4.0 - Structured Preview + Unified Dashboard
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Gradle 8.9
+      - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -35,90 +35,76 @@ jobs:
           MANAGER=$(find "$SDK/cmdline-tools" -type f -name sdkmanager -print -quit)
           test -x "$MANAGER"
           yes | "$MANAGER" --sdk_root="$SDK" --licenses >/dev/null || true
-          "$MANAGER" --sdk_root="$SDK" \
-            'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+          "$MANAGER" --sdk_root="$SDK" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
 
-      - name: Extract and validate current release
+      - name: Extract v1.4.0 project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="WA-Ultimate-Scanner-Android-v1.3.9-CONTEXT-METADATA-UNIFIED-UI.zip"
+          ZIP="WA-Ultimate-Scanner-Android-v1.4.0-STRUCTURED-PREVIEW-UNIFIED-DASHBOARD.zip"
           test -f "$ZIP"
           unzip -tq "$ZIP"
-          mkdir -p extracted
+          rm -rf extracted && mkdir extracted
           unzip -oq "$ZIP" -d extracted
-          PROJECT=$(find extracted -name settings.gradle -type f -print -quit)
-          test -n "$PROJECT"
-          DIR=$(dirname "$PROJECT")
+          SETTINGS=$(find extracted -name settings.gradle -type f -print -quit)
+          test -n "$SETTINGS"
+          DIR=$(dirname "$SETTINGS")
           test -f "$DIR/app/build.gradle"
           echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
 
-      - name: Syntax checks, parser tests and 192-link navigation simulation
+      - name: Source QA
         shell: bash
         run: |
           set -euo pipefail
-          SRC="$PROJECT_DIR/app/src/main/java/com/waultimate/scanner"
-          TESTS="$PROJECT_DIR/tests"
-          mkdir -p "$RUNNER_TEMP/wa-test-classes"
-          javac -d "$RUNNER_TEMP/wa-test-classes" \
-            "$SRC/PreviewParser.java" "$SRC/NavigationPolicy.java" \
-            "$SRC/QueuePlanner.java" "$TESTS/PreviewParserTest.java" "$TESTS/ClassificationModelTest.java" \
-            "$TESTS/NavigationEngineTest.java" "$TESTS/FullFlowSimulationTest.java" \
-            "$TESTS/SyntaxCheck.java"
-          java -cp "$RUNNER_TEMP/wa-test-classes" SyntaxCheck "$SRC" \
-            | tee "$GITHUB_WORKSPACE/source-syntax.log"
-          java -cp "$RUNNER_TEMP/wa-test-classes" com.waultimate.scanner.PreviewParserTest \
-            | tee "$GITHUB_WORKSPACE/parser-tests.log"
-          java -cp "$RUNNER_TEMP/wa-test-classes" com.waultimate.scanner.ClassificationModelTest \
-            | tee "$GITHUB_WORKSPACE/classification-tests.log"
-          java -cp "$RUNNER_TEMP/wa-test-classes" com.waultimate.scanner.NavigationEngineTest \
-            | tee "$GITHUB_WORKSPACE/navigation-tests.log"
-          java -cp "$RUNNER_TEMP/wa-test-classes" com.waultimate.scanner.FullFlowSimulationTest \
-            | tee "$GITHUB_WORKSPACE/flow-simulation.log"
+          cd "$PROJECT_DIR"
+          bash tests/run_local_checks.sh | tee "$GITHUB_WORKSPACE/local-checks.log"
 
-      - name: Build Android debug preview APK
+      - name: Build Debug APK
         shell: bash
         run: |
           set -o pipefail
           cd "$PROJECT_DIR"
-          gradle --no-daemon --stacktrace :app:assembleDebug \
-            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          env \
+            -u WA_SIGNING_KEYSTORE \
+            -u WA_SIGNING_STORE_PASSWORD \
+            -u WA_SIGNING_KEY_ALIAS \
+            -u WA_SIGNING_KEY_PASSWORD \
+            gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
-      - name: Verify APK signature and preview package
+      - name: Verify APK
         if: success()
         shell: bash
         run: |
           set -euo pipefail
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" -type f -name '*.apk' -print -quit)
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" \
-            | tee "$GITHUB_WORKSPACE/signature.log"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" \
-            | grep '^package:' | tee "$GITHUB_WORKSPACE/package.log"
-          grep -q 'com.waultimate.scanner.meta139' "$GITHUB_WORKSPACE/package.log"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$GITHUB_WORKSPACE/signature.log"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee "$GITHUB_WORKSPACE/package.log"
+          grep -q 'com.waultimate.scanner.v140' "$GITHUB_WORKSPACE/package.log"
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          cp "$APK" "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.0.apk"
+          sha256sum "$GITHUB_WORKSPACE/release/WA-Ultimate-Scanner-v1.4.0.apk" > "$GITHUB_WORKSPACE/release/SHA256.txt"
 
-      - name: Upload preview APK
+      - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-Scanner-v1.3.9-UNIFIED-PREVIEW-APK
-          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          name: WA-Ultimate-Scanner-v1.4.0-APK
+          path: |
+            release/WA-Ultimate-Scanner-v1.4.0.apk
+            release/SHA256.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Always preserve QA and build logs
+      - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WA-v1.3.9-Build-Diagnostics
+          name: WA-v1.4.0-Build-Diagnostics
           path: |
+            local-checks.log
             build.log
-            source-syntax.log
-            parser-tests.log
-            classification-tests.log
-            navigation-tests.log
-            flow-simulation.log
             signature.log
             package.log
           if-no-files-found: ignore
